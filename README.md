@@ -1,2 +1,2 @@
 # aahmed24.github.io
-CMSC320 FINAL PROJECT
+Final Project for CMSC320 Spring 2020
