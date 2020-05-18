@@ -1,0 +1,498 @@
+---
+title: "FINAL PROJECT"
+author: "Ali Ahmed"
+date: "4/30/2020"
+output:
+  html_document:
+    df_print: paged
+---
+
+Here is a list of the libraries that we may need for this tutorial.
+dplyr, broom, ggplot2, tidyverse, lubridate, tidyr, png, magick. 
+
+```{r message=FALSE, warning=FALSE}
+library(dplyr)
+library(broom)
+library(ggplot2)
+library(tidyverse)
+library(lubridate)
+library(tidyr)
+library(png)
+library(magick)
+library(DataExplorer)
+```
+
+INTRODUCTION:
+
+In soccer having a potent offense is necessary to secure points and ultimately win championships.
+While defending is an important facet in the game, I feel that a potent offense is still far more
+important to the overall success of a soccer club, and in my book, a potent offense can carry a leaky defense.
+
+I will be using player data from the video game FIFA20 and I will examine how many
+attacking players comprise the top 1500 players in the game.
+After this, I will look at what specific player stats have the most impact
+on an attacking player's overall rating.
+
+
+BACKGROUND ON THE DATA:
+
+A link to the Kaggle dataset I will be referring to [Found Here.](https://www.kaggle.com/stefanoleone992/fifa-20-complete-player-dataset#players_20.csv)
+The players_20.csv file contains 18,278 players available in the FIFA 20 career mode. 
+Each player has a host of their skills rated from 1 to 100 (these skills include speed, agility,
+balance, speed, vision, strength, jumping ability, composure, and things of that nature).
+The game also keeps track of what club and country each player plays for as well as their position on the pitch.
+For this tutorial we will be focusing on player positions and their skill ratings
+club and country are not something that we need to worry about.
+
+The owner of this specific dataset scraped their data from a website called sofifa
+which is a database that contains all the players available in FIFA 20 and they posted their findings onto Kaggle.
+
+Here is a link to a specific player page on [sofifa.](https://sofifa.com/player/231677)
+It shows a breakdown of Marcus Rashford’s (striker/winger for Manchester United) skill ratings
+as well as other pertinent information about him such as his club, country of origin, and current approximate market value.
+
+
+BACKGROUND ON THE SPORT:
+
+The image below gives a visual representation of the possible position a soccer
+player may play in over the duration of a match. Now, I will provide a definition
+for each abbreviation. An ST is a player who plays striker, their purpose is to get
+in positions where they can score a goal. A CF is a center-forward and they have the
+same responsibilities as a striker which is to score goals and get in behind the defense.
+RW/LW are players who play left wing or right wing respectively, these players utilize their
+speed to provide width during an attack by attacking the wide portions of the field.
+A CAM is a central attacking midfielder they play behind the wingers and the strikers
+their main goal is to create goal-scoring opportunities for the wingers, the strikers
+and anyone who may be in a good attacking spot. A CM is a central midfielder they play
+in between the defenders and the attackers, their job is to maintain possession of the ball,
+taking the ball from the opponent, and moving the ball from defense to offense.
+RM/LM are players who play left midfield or right field they generally have the
+same responsibilities as a right or left-winger. A CB is center-back their job
+is to stop the opposing attacking players from getting in behind and scoring goals
+they are also responsible for covering the central portion of the goal.
+RB/RWB/LB/LWB is right-back, right-wing back, left-back, and left-wing back respectively,
+their job is to prevent the wide midfielders and wingers from running rampant on the wing
+and preventing the ball from coming into the box from their side of the field.
+Last but not least the GK is the goalkeeper they are the last line of defense and
+their job is to keep the ball from going into the net.
+
+For the purpose of this tutorial, we will be focusing on the strikers, wingers,
+and center forwards since they generally have the responsibility of providing the goals.
+
+```{r message=FALSE, warning=FALSE}
+img_path <- "/Users/alinu/Desktop/school/year 5/Spring/CMSC320/soccer_positions.jpg"
+
+img <- image_read(img_path)
+
+plot(img)
+```
+
+
+GATHERING DATA:
+
+First, we need to download and import the data that we will be analyzing.
+Here is a link to the source of the dataset we will be using for this tutorial: [Kaggle](https://www.kaggle.com/stefanoleone992/fifa-20-complete-player-dataset#players_20.csv)
+
+Download the data and save it as a CSV file.
+
+Here we make sure to add the necessary libraries and load the contents of our data into a data frame.
+
+
+```{r message=FALSE, warning=FALSE}
+fifa_players <- read.csv("players_20.csv")
+```
+
+Let us check to make sure that the CSV downloaded properly into our data frame by calling head() onto fifa_players.
+The head() function will return the first 6 rows of our data frame by default which is what we want.
+
+
+```{r message=FALSE, warning=FALSE}
+head(fifa_players)
+```
+
+EXPLORATORY DATA ANALYSIS:
+
+Since we care about the player overalls and their team position let us make sure that
+our data frame does not contain NA in these specific columns by using is.na() and subset().
+
+```{r message=FALSE, warning=FALSE}
+new_fifa_players <- subset(fifa_players, !(is.na(fifa_players$overall)))
+new_fifa_players <- subset(fifa_players, !(is.na(fifa_players$team_position)))
+new_fifa_players <- subset(fifa_players, !(is.na(fifa_players$team_jersey_number)))
+head(new_fifa_players)
+```
+
+
+Now let us order the data frame by player overall from highest to lowest using order(). Then we get the top 1500 players and put those in another
+data frame called top1500.
+
+
+```{r message=FALSE, warning=FALSE}
+
+new_fifa_players <- fifa_players[order(-fifa_players$overall),]
+
+top1500 <- head(new_fifa_players, 1500)
+head(top1500) 
+```
+
+
+Now that we have the top 1500 players let us find all of the players who play in the attacking positions and keep track of them.
+We want to focus on the starters at each club, so we will ignore players who may be attackers but come off the bench or 
+those who are in the reserves. 
+
+First, we create a data frame called attacking_players, which keeps track of 
+which players in the top1500 are in fact attackers. 
+
+```{r message=FALSE, warning=FALSE}
+
+pos_vec <- top1500$team_position
+pos_vec <- unique(pos_vec)
+
+attack_pos <- c('ST','LW','LF','RW','RF','CF','RS','LS')
+as.vector(attack_pos)
+
+attacking_players <- top1500
+
+attacking_players$is_attacker <- attacking_players$team_position %in% attack_pos
+
+top1500$is_attacker <- attacking_players$team_position %in% attack_pos
+
+new_fifa_players$is_attacker <- new_fifa_players$team_position %in% attack_pos
+
+attacking_players <- attacking_players %>%
+ filter(is_attacker == TRUE)
+head(attacking_players)
+```
+
+Next, we will do a breakdown of the top1500 players to see the ratio between the number of attackers
+vs non-attackers as well as an itemized view of the number of players at a certain position. 
+
+First, let us get a visualization for the total number of attackers vs non-attackers.
+We will need to use the group_by() function to group the players who are attackers. 
+Then we use ggplot to get a graphical representation of the data. We will use the geom_col 
+function to represent the two groups.
+Group 1 represents the players who do not play an attacking role for their club and 
+Group 2 represents the players who do play an attacking role for their club.
+
+```{r message=FALSE, warning=FALSE}
+
+attack_v_nonattack <- top1500 %>%
+  group_by(is_attacker) %>%
+  count(is_attacker)
+
+attack_v_nonattack %>%
+ ggplot(aes(x=is_attacker,y=n,label=is_attacker)) +
+        geom_col()+
+        xlab("Is this an attacker")+
+        ylab("count")
+
+```
+
+Since we broke down the total number of attackers to non-attackers let us break 
+it down even more to a position by position look. To do this we will use the 
+group_by() function to group by position and we will call count on each respective 
+position to get their total.
+
+```{r message=FALSE, warning=FALSE}
+
+position_brkdwn <- top1500 %>%
+  group_by(team_position) %>%
+  count(team_position) 
+
+position_brkdwn <- position_brkdwn[order(-position_brkdwn$n),]
+
+head(position_brkdwn)
+
+```
+
+When we do a breakdown of all the positions that are in the top1500 we get a couple that should not be included. 
+They are the SUB, RES, and players with no positions so we need to clean that up before we can move on.
+
+Our Solution is to drop the rows that are blank and the rows that contain SUB or RES.
+
+```{r message=FALSE, warning=FALSE}
+position_brkdwn <-position_brkdwn[!(position_brkdwn$team_position == "" | 
+                                   position_brkdwn$team_position == "SUB" | 
+                                   position_brkdwn$team_position == "RES"),]
+position_brkdwn <- position_brkdwn[order(-position_brkdwn$n),]
+
+head(position_brkdwn)
+```
+
+
+The data frame is now good to go since we dropped the rows that we do not need,
+so we can now proceed to get a graphical representation of the results from position_brkdwn. 
+
+Again we will use ggplot(), make sure to order the data from smallest to largest based on what count() returns. 
+The graph x-axis may look condensed if it is oriented vertically
+so you can call coor_flip() to orient it horizontally and it will be more readable. To make the graph more
+visually appealing we will color each column based on a respective position. 
+
+```{r message=FALSE, warning=FALSE}
+
+position_brkdwn %>% 
+  ggplot(aes(x=reorder(team_position,-n),y=n)) +
+  geom_col(aes(color= team_position,fill= team_position))  +
+  xlab("positions") +
+  ylab("count") +
+  coord_flip()
+```
+
+From the graph, we see that a lot of players in the top 1500 who are starters are goalkeepers, 
+with center backs coming in second and third, and to round out the top 4 we have strikers. 
+Another notable point is that strikers are the only attackers in the top 10. 
+The other 9 spots in the top are distributed between midfielders and defenders. 
+
+Since we have a graphical representation of all positions in the top 1500 
+let us get a graphical visualization of attackers in the top 1500. 
+
+```{r message=FALSE, warning=FALSE}
+
+attackers_pos<-attacking_players %>% 
+  group_by(team_position) %>%
+  count(team_position)
+
+attackers_pos %>%
+  ggplot(aes(x=reorder(team_position,-n),y=n)) +
+  geom_col(aes(color= team_position,fill= team_position))  +
+  xlab("positions") +
+  ylab("count") +
+  coord_flip()
+```
+
+From this, we see that strikers of any variation make up the majority of attackers
+in the top 1500. Wingers come in next with center forwards, left forwards and 
+right forwards rounding out the bottom. 
+
+Now that we know the positional breakdown let us group the attackers in the entire 
+dataset by their respective overalls just to see a graphical representation of the 
+distribution of elite attackers.
+
+Let us make a data frame of overall player rating to the total number of them that
+appear in the FIFA player database. As a side note, we only care about starters, 
+not players who play in the reserves or come off the bench. 
+
+```{r message=FALSE, warning=FALSE}
+
+attacker_ratings <- new_fifa_players %>%
+  filter(is_attacker) %>%
+  group_by(overall) %>%
+  count(overall)
+
+head(attacker_ratings)
+  
+
+```
+
+```{r message=FALSE, warning=FALSE}
+
+attacker_ratings %>%
+  ggplot(aes(x=reorder(overall,-overall),y=n)) +
+  geom_col(aes(color= overall,fill= overall))  +
+  xlab("overall") +
+  ylab("count") +
+  coord_flip()
+
+```
+
+From this graph we see a large portion of the attackers fall between a range of 61 and 75. There are very few elite attacking starters. 
+
+Now that we have seen a position break down for each position as well as an overall
+break down of the players, let us now see what skills have a high impact on attacking player's overall ratings. This way we can see what makes the elite players like 
+Messi and Ronaldo different.
+
+FIFA has broken player skills into 7 major categories
+(Pace, Defense, Shooting, Goalkeeping, Dribbling, Physical and Passing) each with 
+a varying number of skills.
+
+Here is an image of an actual FIFA card for reference. 
+If you would like to learn more about the image_read() function
+[go to this website.](https://cran.r-project.org/web/packages/magick/vignettes/intro.html)
+
+```{r message=FALSE, warning=FALSE}
+img_path <- "/Users/alinu/Desktop/school/year 5/Spring/CMSC320/Rashford.png"
+
+img <- image_read(img_path)
+
+plot(img)
+
+```
+
+Let us create a data frame with columns that correlate to each skill as well as some
+identifiers for each attacking player in the top 1500. Since we are looking at attacking
+players we can ignore the defensive stats. The last column in each 
+Data Frame will be the average of all of the numerical values of each skill in a specific category. 
+
+```{r message=FALSE, warning=FALSE}
+
+Pace <- data.frame(attacking_players$short_name,attacking_players$movement_acceleration, 
+                   attacking_players$movement_sprint_speed,
+                   Avg_Pace = ((attacking_players$movement_acceleration+attacking_players$movement_sprint_speed)/2))
+
+Shooting <- data.frame(attacking_players$short_name,attacking_players$mentality_positioning, 
+                       attacking_players$attacking_finishing, 
+              attacking_players$power_shot_power, attacking_players$power_long_shots,
+              attacking_players$attacking_volleys,attacking_players$mentality_penalties,
+              Avg_Shooting = ((attacking_players$mentality_positioning+
+                       attacking_players$attacking_finishing+ 
+              attacking_players$power_shot_power+ attacking_players$power_long_shots+
+              attacking_players$attacking_volleys+attacking_players$mentality_penalties)/6))
+
+
+Passing <- data.frame(attacking_players$short_name,attacking_players$mentality_vision, 
+                      attacking_players$attacking_crossing,
+             attacking_players$skill_fk_accuracy, attacking_players$attacking_short_passing,
+             attacking_players$skill_long_passing, attacking_players$skill_curve,
+             Avg_Passing = ((attacking_players$mentality_vision+
+                      attacking_players$attacking_crossing+
+             attacking_players$skill_fk_accuracy+ attacking_players$attacking_short_passing+
+             attacking_players$skill_long_passing+ attacking_players$skill_curve)/6))
+
+
+Dribbling <- data.frame(attacking_players$short_name,attacking_players$movement_agility,
+                        attacking_players$movement_balance,
+               attacking_players$movement_reactions,attacking_players$skill_ball_control,
+               attacking_players$dribbling,attacking_players$mentality_composure,
+               Avg_Dribbling = ((attacking_players$movement_agility+
+                        attacking_players$movement_balance+
+               attacking_players$movement_reactions+attacking_players$skill_ball_control+
+               attacking_players$dribbling+attacking_players$mentality_composure)/6))
+
+Physical <- data.frame(attacking_players$short_name,attacking_players$power_jumping,
+                       attacking_players$power_stamina,attacking_players$power_strength,
+                       attacking_players$mentality_aggression,
+                       Avg_Physical = ((attacking_players$power_jumping+
+                       attacking_players$power_stamina+attacking_players$power_strength+
+                       attacking_players$mentality_aggression)/4))
+
+Player_Identifier <- data.frame(attacking_players$short_name,attacking_players$sofifa_id 
+                                ,attacking_players$team_position,
+                                attacking_players$overall)
+
+```
+
+Great, we now have a data frame for each category that may influence attacking
+players overall. Now let us combine these data frames. 
+To combine the data frames we will be using the merge() function.
+One we do that we will then make another data frame that only contains the average 
+of each attribute using the data.frame() method. 
+
+```{r message=FALSE, warning=FALSE}
+Merge_attackers <- merge(x=Player_Identifier,y=Pace, all=TRUE)
+Merge_attackers <- merge(x=Merge_attackers,y=Shooting, all = TRUE)
+Merge_attackers <- merge(x=Merge_attackers,y=Passing, all = TRUE)
+Merge_attackers <- merge(x=Merge_attackers,y=Dribbling, all = TRUE)
+Merge_attackers <- merge(x=Merge_attackers,y=Physical, all = TRUE)
+
+Merge_attackers <- Merge_attackers[order(-Merge_attackers$attacking_players.overall),]
+
+
+Merge_attackers_general <- data.frame(Merge_attackers$attacking_players.short_name,
+                                      Merge_attackers$attacking_players.overall,
+                                      Merge_attackers$attacking_players.team_position,
+                                      Merge_attackers$Avg_Pace, Merge_attackers$Avg_Dribbling, 
+                                      Merge_attackers$Avg_Passing, Merge_attackers$Avg_Physical
+                                      , Merge_attackers$Avg_Shooting)
+```
+
+CORRELATION MATRIX: 
+
+In this section we will create a correlation matrix to see which attributes 
+most closely correlate to an attacking players overall. 
+
+If you would like to learn more about how a correlation matrix works visit [Here.](http://www.sthda.com/english/wiki/correlation-matrix-a-quick-start-guide-to-analyze-format-and-visualize-a-correlation-matrix-using-r-software)
+
+```{r message=FALSE, warning=FALSE}
+short_name1 <- Merge_attackers_general %>%
+  select(2,4:8)
+
+names(short_name1)[names(short_name1) == "Merge_attackers.attacking_players.overall"] <- "overall"
+
+names(short_name1)[names(short_name1) == "Merge_attackers.Avg_Pace"] <- "Avg Pace"
+
+names(short_name1)[names(short_name1) == "Merge_attackers.Avg_Dribbling"] <- "Avg Dribbling"
+
+names(short_name1)[names(short_name1) == "Merge_attackers.Avg_Passing"] <- "Avg Passing"
+
+names(short_name1)[names(short_name1) == "Merge_attackers.Avg_Physical"] <- "Avg Physical"
+
+names(short_name1)[names(short_name1) == "Merge_attackers.Avg_Shooting"] <- "Avg Shooting"
+
+numer = sapply(short_name1,as.numeric)
+corr_matrix = cor(numer)
+plot_correlation(corr_matrix)
+```
+
+From the correlation matrix we see that dribbling passing and shooting have the 
+highest impact on an attacking players overall. In the next section we will 
+create a linear regression and check to see if we get similar results. 
+
+LINEAR REGRESSION SECTION:
+
+Now that we have a Data Frame with the average of each category, 
+we will now perform the final steps in this tutorial. We will use a linear 
+regression model to see which stat category has the greatest impact on 
+player overall. 
+
+First, create two data frames representing the dependent and independent values,
+then we use the lm() function to run a linear regression on our data.
+For more help on how to use lm visit this website for an [example:](http://www.r-tutor.com/elementary-statistics/multiple-linear-regression/significance-test-mlr)
+
+```{r message=FALSE, warning=FALSE}
+
+independent_var <- Merge_attackers_general %>%
+  select(4:8)
+
+dependent_var <- Merge_attackers_general %>%
+  select(2) 
+
+names(dependent_var)[names(dependent_var) == "Merge_attackers.attacking_players.overall"] <- "overall"
+
+names(independent_var)[names(independent_var) == "Merge_attackers.Avg_Pace"] <- "Avg Pace"
+
+names(independent_var)[names(independent_var) == "Merge_attackers.Avg_Dribbling"] <- "Avg Dribbling"
+
+names(independent_var)[names(independent_var) == "Merge_attackers.Avg_Passing"] <- "Avg Passing"
+
+names(independent_var)[names(independent_var) == "Merge_attackers.Avg_Physical"] <- "Avg Physical"
+
+names(independent_var)[names(independent_var) == "Merge_attackers.Avg_Shooting"] <- "Avg Shooting"
+
+overall.lm = lm(dependent_var$overall ~ + independent_var$`Avg Pace` +
+                  independent_var$`Avg Dribbling` + independent_var$`Avg Passing`
+                + independent_var$`Avg Physical` + independent_var$`Avg Shooting`,
+                data= Merge_attackers_general)
+
+summary(overall.lm)
+
+```
+
+From the summary of our linear regression model we see that, Avg_Dribbling,
+Avg_Physical, Avg_Shooting and Avg Pace
+all have a p-value less than .05, which means that
+they are all statistically significant in terms of impacting player overall.
+The linear regression also returned a similar response to our correlation matrix 
+from the previous section which is good. 
+
+CONCLUSION: 
+
+From this tutorial we were able to isolate the top 1500 soccer players in 
+FIFA 20. We were then able to separate attackers from non-attackers. Finally we 
+were able to create a linear regression model to see which attributes had the most 
+impact on an attacking player's overall rating. 
+
+Thank you for reading this tutorial.
+
+RESOURCES: 
+
+http://www.r-tutor.com/elementary-statistics/multiple-linear-regression/significance-test-mlr
+
+http://www.sthda.com/english/wiki/correlation-matrix-a-quick-start-guide-to-analyze-format-and-visualize-a-correlation-matrix-using-r-software
+
+https://cran.r-project.org/web/packages/magick/vignettes/intro.html
+
+https://www.kaggle.com/stefanoleone992/fifa-20-complete-player-dataset#players_20.csv
+
+https://sofifa.com/player/231677
+
+https://www.kaggle.com/stefanoleone992/fifa-20-complete-player-dataset#players_20.csv
